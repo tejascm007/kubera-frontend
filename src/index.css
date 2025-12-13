@@ -166,6 +166,12 @@
   .text-balance {
     text-wrap: balance;
   }
+  
+  /* Break long URLs and text */
+  .overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 @keyframes fadeIn {

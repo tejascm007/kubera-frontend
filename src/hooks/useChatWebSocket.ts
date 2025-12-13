@@ -32,6 +32,7 @@ export interface RateLimits {
 
 export interface ChartData {
   chart_url: string;
+  chart_html?: string;  // HTML content for direct rendering
   chart_symbol: string;
   chart_available: boolean;
 }
@@ -55,7 +56,7 @@ export interface ChatWebSocketState {
 
 interface UseChatWebSocketOptions {
   chatId: string | null;
-  onMessageComplete?: (content: string, metadata?: { tokens_used?: number; tools_used?: string[]; chart_url?: string }) => void;
+  onMessageComplete?: (content: string, metadata?: { tokens_used?: number; tools_used?: string[]; chart_url?: string; chart_html?: string }) => void;
   onError?: (error: string) => void;
   onChartGenerated?: (chartData: ChartData) => void;
   onRateLimitExceeded?: (message: string) => void;
@@ -241,11 +242,19 @@ export function useChatWebSocket({
           case 'complete':
           case 'message_complete':
             const finalContent = streamingContentRef.current;
+
+            // Extract metadata - backend sends it in data.metadata
+            const backendMetadata = data.metadata || {};
             const metadata = {
-              tokens_used: data.tokens_used,
-              tools_used: data.tools_used || lastMessageMetadataRef.current.tools_used,
-              chart_url: lastMessageMetadataRef.current.chart_url,
+              tokens_used: data.tokens_used || backendMetadata.tokens_used,
+              tools_used: data.tools_used || backendMetadata.tools_used || lastMessageMetadataRef.current.tools_used,
+              // Chart URL can come from backend metadata OR from earlier chart_generated event
+              chart_url: backendMetadata.chart_url || lastMessageMetadataRef.current.chart_url,
+              // Chart HTML for direct rendering (no iframe needed)
+              chart_html: backendMetadata.chart_html,
             };
+
+            console.log('[WS] Message complete, metadata:', metadata);
 
             streamingContentRef.current = '';
             lastMessageMetadataRef.current = {};

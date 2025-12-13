@@ -600,6 +600,7 @@ export interface ChatMessage {
   mcp_servers_called?: string[];
   mcp_tools_used?: string[];
   charts_generated: number;
+  chart_url?: string;  // Chart URL for visualizations
   processing_time_ms?: number;
   llm_model?: string;
   created_at: string;

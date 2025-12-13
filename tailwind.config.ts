@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
 export default {
   darkMode: ["class"],
@@ -16,6 +18,7 @@ export default {
       fontFamily: {
         lato: ['Lato', 'sans-serif'],
         raleway: ['Raleway', 'sans-serif'],
+        code: ['"Cascadia Code"', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -119,5 +122,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate, typography],
 } satisfies Config;

@@ -17,6 +17,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   chart_url?: string;
+  chart_html?: string;  // Chart HTML for direct rendering
 }
 
 interface Chat {
@@ -41,9 +42,41 @@ export default function ChatPage() {
   const loadedChatsRef = useRef<Set<string>>(new Set());
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+  // Chart modal state - for displaying charts in a modal within chat area
+  const [chartModal, setChartModal] = useState<{
+    isOpen: boolean;
+    chartUrl: string | null;
+    chartHtml: string | null;
+    chartName: string;
+  }>({
+    isOpen: false,
+    chartUrl: null,
+    chartHtml: null,
+    chartName: '',
+  });
+  const [chartLoading, setChartLoading] = useState(false);
+  const [fetchedChartHtml, setFetchedChartHtml] = useState<string | null>(null);
+
+  // Handler for when user clicks a chart button in a message
+  const handleChartClick = useCallback((chartUrl: string | null, chartHtml: string | null, chartName: string) => {
+    setChartModal({
+      isOpen: true,
+      chartUrl,
+      chartHtml,
+      chartName,
+    });
+    setFetchedChartHtml(null); // Reset fetched HTML for new chart
+  }, []);
+
   // WebSocket hook
-  const handleMessageComplete = useCallback((content: string, metadata?: { chart_url?: string }) => {
+  const handleMessageComplete = useCallback((content: string, metadata?: { chart_url?: string; chart_html?: string }) => {
     if (!activeChat) return;
+
+    // Debug: Log chart data to verify it's being received
+    console.log('[Chat] Message complete, metadata:', metadata);
+    if (metadata?.chart_html) {
+      console.log('[Chart] Chart HTML received:', metadata.chart_html.length, 'bytes');
+    }
 
     setChats(prev =>
       prev.map(chat =>
@@ -52,7 +85,7 @@ export default function ChatPage() {
             ...chat,
             messages: chat.messages.map((msg, idx) =>
               idx === chat.messages.length - 1 && msg.role === 'assistant'
-                ? { ...msg, content, chart_url: metadata?.chart_url }
+                ? { ...msg, content, chart_url: metadata?.chart_url, chart_html: metadata?.chart_html }
                 : msg
             ),
             lastMessage: content.slice(0, 50),
@@ -92,6 +125,31 @@ export default function ChatPage() {
     onError: handleWSError,
     onChatRenamed: handleChatRenamed,
   });
+
+  // Fetch chart HTML from URL when modal opens (if not already provided)
+  useEffect(() => {
+    if (chartModal.isOpen && chartModal.chartUrl && !chartModal.chartHtml && !fetchedChartHtml) {
+      setChartLoading(true);
+      console.log('[Chart] Fetching HTML from URL:', chartModal.chartUrl);
+      fetch(chartModal.chartUrl)
+        .then(response => {
+          if (response.ok) return response.text();
+          throw new Error('Failed to fetch chart');
+        })
+        .then(html => {
+          console.log('[Chart] Fetched HTML:', html.length, 'bytes');
+          setFetchedChartHtml(html);
+          setChartLoading(false);
+        })
+        .catch(err => {
+          console.error('[Chart] Error fetching chart:', err);
+          setChartLoading(false);
+        });
+    }
+  }, [chartModal.isOpen, chartModal.chartUrl, chartModal.chartHtml, fetchedChartHtml]);
+
+  // Chart HTML to display (from props or fetched)
+  const displayChartHtml = chartModal.chartHtml || fetchedChartHtml;
 
   // Load chats from API
   useEffect(() => {
@@ -150,29 +208,26 @@ export default function ChatPage() {
             c.id === activeChat
               ? {
                 ...c,
-                messages: [
-                  // User messages
-                  ...response.messages.map((m: ApiChatMessage): Message => ({
+                // Backend returns messages in chronological order (ORDER BY created_at ASC)
+                // We interleave user messages and assistant responses
+                messages: response.messages.flatMap((m: ApiChatMessage): Message[] => {
+                  const result: Message[] = [];
+                  // User message first
+                  result.push({
                     id: m.message_id,
                     role: 'user',
                     content: m.user_message,
-                  })),
-                  // Assistant responses
-                  ...response.messages
-                    .filter((m: ApiChatMessage) => m.assistant_response)
-                    .map((m: ApiChatMessage): Message => ({
+                  });
+                  // Then assistant response if it exists
+                  if (m.assistant_response) {
+                    result.push({
                       id: m.message_id + '_assistant',
                       role: 'assistant',
-                      content: m.assistant_response || '',
-                    }))
-                ].sort((a, b) => {
-                  // Sort by message_id to maintain order
-                  const aId = a.id.replace('_assistant', '');
-                  const bId = b.id.replace('_assistant', '');
-                  if (aId === bId) {
-                    return a.role === 'user' ? -1 : 1;
+                      content: m.assistant_response,
+                      chart_url: m.chart_url,
+                    });
                   }
-                  return aId.localeCompare(bId);
+                  return result;
                 }),
               }
               : c
@@ -424,35 +479,88 @@ export default function ChatPage() {
 
         {/* Tool status is now shown inline in ChatMessage */}
 
-        <ScrollArea className="flex-1">
-          <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-            {isLoadingChats ? (
-              <div className="text-center py-20">
-                <div className="animate-pulse text-muted-foreground">Loading chats...</div>
+        <div className="flex-1 relative overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+              {isLoadingChats ? (
+                <div className="text-center py-20">
+                  <div className="animate-pulse text-muted-foreground">Loading chats...</div>
+                </div>
+              ) : currentChat?.messages.length === 0 ? (
+                <div className="text-center py-20">
+                  <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
+                  <p className="text-muted-foreground text-sm">Ask about any Indian stock for detailed analysis</p>
+                </div>
+              ) : (
+                currentChat?.messages.map((message, index) => {
+                  const isLastAssistant = index === currentChat.messages.length - 1 && message.role === 'assistant';
+                  return (
+                    <ChatMessage
+                      key={message.id}
+                      role={message.role}
+                      content={message.content}
+                      chartUrl={message.chart_url}
+                      chartHtml={message.chart_html}
+                      isStreaming={isStreaming && isLastAssistant}
+                      toolStatus={isLastAssistant ? toolStatus : []}
+                      onChartClick={handleChartClick}
+                    />
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+
+          {/* Chart Modal - positioned within chat area only */}
+          {chartModal.isOpen && (
+            <div
+              className="absolute inset-0 z-40 flex items-center justify-center bg-black/30"
+              onClick={() => setChartModal(prev => ({ ...prev, isOpen: false }))}
+            >
+              {/* Modal Card */}
+              <div
+                className="relative bg-white rounded-lg shadow-xl overflow-hidden"
+                style={{ width: '680px', maxWidth: '95%', height: '480px', maxHeight: '85%' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close button */}
+                <button
+                  onClick={() => setChartModal(prev => ({ ...prev, isOpen: false }))}
+                  className="absolute top-2 right-2 z-20 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                  title="Close"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                {/* Chart Content */}
+                <div className="h-full w-full">
+                  {chartLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-gray-500 text-sm">Loading chart...</span>
+                      </div>
+                    </div>
+                  ) : displayChartHtml ? (
+                    <iframe
+                      srcDoc={displayChartHtml}
+                      className="h-full w-full border-0"
+                      title="Stock Chart"
+                      sandbox="allow-scripts allow-same-origin allow-downloads"
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+                      Failed to load chart
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : currentChat?.messages.length === 0 ? (
-              <div className="text-center py-20">
-                <h3 className="text-lg font-medium mb-2">Start a conversation</h3>
-                <p className="text-muted-foreground text-sm">Ask about any Indian stock for detailed analysis</p>
-              </div>
-            ) : (
-              currentChat?.messages.map((message, index) => {
-                const isLastAssistant = index === currentChat.messages.length - 1 && message.role === 'assistant';
-                return (
-                  <ChatMessage
-                    key={message.id}
-                    role={message.role}
-                    content={message.content}
-                    chartUrl={message.chart_url}
-                    isStreaming={isStreaming && isLastAssistant}
-                    toolStatus={isLastAssistant ? toolStatus : []}
-                  />
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+            </div>
+          )}
+        </div>
 
         <ChatInput onSend={handleSendMessage} disabled={isStreaming || !isConnected} />
       </div>

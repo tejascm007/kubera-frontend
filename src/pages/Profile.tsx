@@ -193,7 +193,37 @@ export default function Profile() {
     try {
       // Backend: DELETE /portfolio/{portfolio_id}
       await portfolioApi.deleteEntry(id);
+
+      // Find the holding being deleted to update summary
+      const deletedHolding = holdings.find(h => h.id === id);
+
       setHoldings(prev => prev.filter(h => h.id !== id));
+
+      // Update portfolio summary to reflect the removal
+      if (deletedHolding) {
+        const deletedInvestment = deletedHolding.quantity * deletedHolding.avgPrice;
+        const deletedGainLoss = deletedHolding.gainLoss || 0;
+        const deletedCurrentValue = deletedHolding.currentPrice
+          ? deletedHolding.quantity * deletedHolding.currentPrice
+          : deletedInvestment;
+
+        setPortfolioSummary(prev => {
+          const newTotalInvested = prev.totalInvested - deletedInvestment;
+          const newCurrentValue = prev.currentValue - deletedCurrentValue;
+          const newTotalGainLoss = prev.totalGainLoss - deletedGainLoss;
+          const newTotalGainLossPercent = newTotalInvested > 0
+            ? (newTotalGainLoss / newTotalInvested) * 100
+            : 0;
+
+          return {
+            totalInvested: newTotalInvested,
+            currentValue: newCurrentValue,
+            totalGainLoss: newTotalGainLoss,
+            totalGainLossPercent: newTotalGainLossPercent,
+          };
+        });
+      }
+
       toast({ title: 'Holding removed', description: 'The holding has been removed from your portfolio.' });
     } catch (error) {
       console.error('Failed to delete holding:', error);
