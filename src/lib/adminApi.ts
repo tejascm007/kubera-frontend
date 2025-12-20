@@ -3,7 +3,7 @@
 
 import { ApiError, getToken, clearTokens } from './api';
 
-const API_BASE = 'https://kubera-1.onrender.com';
+const API_BASE = 'http://localhost:8000';
 
 // ==================== ADMIN TOKEN MANAGEMENT ====================
 
