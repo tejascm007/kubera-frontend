@@ -49,9 +49,9 @@ export function ChatSidebar({
         </Button>
       </div>
 
-      {/* Chat list - with proper overflow handling */}
-      <ScrollArea className="flex-1 w-full">
-        <div className="p-2 space-y-1 w-full">
+      {/* Chat list - using native scroll for proper width constraint */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="px-3 py-2 space-y-1">
           {chats.length === 0 ? (
             <div className="px-3 py-8 text-center text-sm text-muted-foreground">
               No conversations yet.
@@ -71,7 +71,7 @@ export function ChatSidebar({
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -94,7 +94,7 @@ function ChatItem({
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors w-full overflow-hidden',
+        'group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors w-full max-w-full overflow-hidden',
         isActive
           ? 'bg-sidebar-accent text-sidebar-accent-foreground'
           : 'hover:bg-sidebar-accent/50'
@@ -104,7 +104,7 @@ function ChatItem({
       onMouseLeave={() => setShowMenu(false)}
     >
       <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-sm font-medium truncate">{chat.title}</p>
         <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
       </div>
