@@ -140,6 +140,10 @@ export interface DashboardStats {
   system_status: string;
   portfolio_report_frequency: string;
   portfolio_report_last_sent?: string;
+  // Super admin only
+  total_admins?: number;
+  active_admins?: number;
+  inactive_admins?: number;
 }
 
 export interface PromptActivityDataPoint {
@@ -409,6 +413,39 @@ export const adminActivityLogsApi = {
   },
 };
 
+// ==================== SUPER ADMIN — ADMIN MANAGEMENT ====================
+// Backend: GET /admin/admins, PUT /admin/admins/{id}/deactivate, PUT /admin/admins/{id}/reactivate
+
+export interface AdminListItem {
+  admin_id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  is_super_admin: boolean;
+  created_at: string;
+  last_login_at?: string;
+}
+
+export interface AdminListResponse {
+  success: boolean;
+  total_admins: number;
+  admins: AdminListItem[];
+}
+
+export const adminSuperApi = {
+  // GET /admin/admins - List all normal admins
+  getAdmins: (): Promise<AdminListResponse> =>
+    adminRequest('/admin/admins'),
+
+  // PUT /admin/admins/{admin_id}/deactivate - Deactivate a normal admin
+  deactivateAdmin: (adminId: string): Promise<{ success: boolean; message: string; admin_id: string; is_active: boolean }> =>
+    adminRequest(`/admin/admins/${adminId}/deactivate`, { method: 'PUT' }),
+
+  // PUT /admin/admins/{admin_id}/reactivate - Reactivate a normal admin
+  reactivateAdmin: (adminId: string): Promise<{ success: boolean; message: string; admin_id: string; is_active: boolean }> =>
+    adminRequest(`/admin/admins/${adminId}/reactivate`, { method: 'PUT' }),
+};
+
 // ==================== COMBINED ADMIN API EXPORT ====================
 // For backwards compatibility
 
@@ -420,4 +457,5 @@ export const adminApi = {
   portfolioReports: adminPortfolioReportsApi,
   system: adminSystemApi,
   activityLogs: adminActivityLogsApi,
+  super: adminSuperApi,
 };

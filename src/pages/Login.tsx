@@ -12,19 +12,29 @@ export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { toast } = useToast();
-  
-  const [username, setUsername] = useState('');
+
+  // Load saved username (if user previously checked "Remember Me")
+  const savedUsername = localStorage.getItem('kubera-remembered-username') ?? '';
+
+  const [username, setUsername] = useState(savedUsername);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedUsername); // pre-check if we have a saved username
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username || !password) {
       toast({ title: 'Error', description: 'Please fill in all fields', variant: 'destructive' });
       return;
+    }
+
+    // Save or clear remembered username
+    if (rememberMe) {
+      localStorage.setItem('kubera-remembered-username', username);
+    } else {
+      localStorage.removeItem('kubera-remembered-username');
     }
 
     setIsLoading(true);

@@ -56,7 +56,7 @@ export interface ChatWebSocketState {
 
 interface UseChatWebSocketOptions {
   chatId: string | null;
-  onMessageComplete?: (content: string, metadata?: { tokens_used?: number; tools_used?: string[]; chart_url?: string; chart_html?: string }) => void;
+  onMessageComplete?: (content: string, metadata?: { tokens_used?: number; tools_used?: string[]; chart_url?: string; chart_html?: string; chart_urls?: string[]; chart_htmls?: string[] }) => void;
   onError?: (error: string) => void;
   onChartGenerated?: (chartData: ChartData) => void;
   onRateLimitExceeded?: (message: string) => void;
@@ -248,10 +248,10 @@ export function useChatWebSocket({
             const metadata = {
               tokens_used: data.tokens_used || backendMetadata.tokens_used,
               tools_used: data.tools_used || backendMetadata.tools_used || lastMessageMetadataRef.current.tools_used,
-              // Chart URL can come from backend metadata OR from earlier chart_generated event
               chart_url: backendMetadata.chart_url || lastMessageMetadataRef.current.chart_url,
-              // Chart HTML for direct rendering (no iframe needed)
               chart_html: backendMetadata.chart_html,
+              chart_urls: backendMetadata.chart_urls as string[] | undefined,
+              chart_htmls: backendMetadata.chart_htmls as string[] | undefined,
             };
 
             console.log('[WS] Message complete, metadata:', metadata);

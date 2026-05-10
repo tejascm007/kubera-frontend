@@ -96,35 +96,40 @@ interface ToolStatus {
 interface ChatMessageProps {
   role: 'user' | 'assistant';
   content: string;
-  chartUrl?: string;
-  chartHtml?: string;  // Chart HTML for direct rendering
+  chartUrl?: string;       // legacy single
+  chartHtml?: string;
+  chartUrls?: string[];    // all chart URLs
+  chartHtmls?: string[];   // all chart HTMLs
   isStreaming?: boolean;
   toolStatus?: ToolStatus[];
   onChartClick?: (chartUrl: string | null, chartHtml: string | null, chartName: string) => void;
 }
 
-export function ChatMessage({ role, content, chartUrl, chartHtml, isStreaming, toolStatus = [], onChartClick }: ChatMessageProps) {
+export function ChatMessage({ role, content, chartUrl, chartHtml, chartUrls, chartHtmls, isStreaming, toolStatus = [], onChartClick }: ChatMessageProps) {
   const isUser = role === 'user';
   const [toolsExpanded, setToolsExpanded] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const hasActiveTools = toolStatus.length > 0;
 
-  // Extract chart URL from content if not provided as prop
-  // The LLM may include it as a markdown link in the response
-  const extractedChartUrl = !chartUrl && !chartHtml ? (() => {
-    const urlMatch = content.match(/https:\/\/[^\s)]+supabase[^\s)]+charts[^\s)]+\.html/);
-    return urlMatch ? urlMatch[0] : null;
-  })() : null;
+  // Build a unified list of charts to display.
+  // Start from prop arrays, then add legacy single, then extract from content.
+  // Always extract from content so buttons survive reload even if DB was stale.
+  const propUrls: string[] = chartUrls && chartUrls.length > 0
+    ? chartUrls
+    : chartUrl ? [chartUrl] : [];
 
-  // Use provided chartUrl or extracted one
-  const effectiveChartUrl = chartUrl || extractedChartUrl;
-  const hasChart = !!(effectiveChartUrl || chartHtml);
+  const contentUrls: string[] =
+    content.match(/https:\/\/[^\s)]+supabase[^\s)]+charts[^\s)]+\.html/g) ?? [];
 
-  // Extract chart name from URL for display
-  const chartName = effectiveChartUrl
-    ? effectiveChartUrl.split('/').pop()?.replace(/_/g, ' ').replace('.html', '') || 'Stock Chart'
-    : 'Stock Chart';
+  // Merge, deduplicate
+  const allUrls = [...new Set([...propUrls, ...contentUrls])];
+
+  const charts: { url: string; html: string | null; name: string }[] = allUrls.map((url, i) => ({
+    url,
+    html: chartHtmls?.[i] ?? null,
+    name: url.split('/').pop()?.replace(/_/g, ' ').replace('.html', '') || `Chart ${i + 1}`,
+  }));
 
   const handleCopy = async () => {
     try {
@@ -191,11 +196,22 @@ export function ChatMessage({ role, content, chartUrl, chartHtml, isStreaming, t
                     <CodeBlock className={className}>{children}</CodeBlock>
                   ),
                   pre: ({ children }) => <>{children}</>,
-                  // Custom link handler - hide chart URLs (we display them as button)
+                  // Custom link handler — render chart links as buttons, others normally
                   a: ({ href, children }) => {
-                    // Hide Supabase chart links
                     if (href?.includes('supabase') && href?.includes('charts')) {
-                      return null; // Don't render - chart button handles this
+                      // Render as a chart button instead of a plain link
+                      const linkText = typeof children === 'string' ? children : String(children);
+                      const chartName = linkText || href.split('/').pop()?.replace(/_/g, ' ').replace('.html', '') || 'Stock Chart';
+                      return (
+                        <button
+                          onClick={() => onChartClick?.(href, null, chartName)}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono bg-muted border border-border hover:bg-muted/80 hover:border-primary/50 transition-colors cursor-pointer my-0.5"
+                          title="Click to view chart"
+                        >
+                          <img src="/assets/chart-icon.png" alt="Chart" className="w-4 h-4" />
+                          <span className="truncate max-w-[250px]">{chartName}</span>
+                        </button>
+                      );
                     }
                     // Render other links normally
                     return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{children}</a>;
@@ -224,16 +240,21 @@ export function ChatMessage({ role, content, chartUrl, chartHtml, isStreaming, t
           )}
         </div>
 
-        {/* Chart Preview Button - compact inline style */}
-        {hasChart && (
-          <button
-            onClick={() => onChartClick?.(effectiveChartUrl, chartHtml || null, chartName)}
-            className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono bg-muted border border-border hover:bg-muted/80 hover:border-primary/50 transition-colors cursor-pointer"
-            title="Click to view chart"
-          >
-            <img src="/assets/chart-icon.png" alt="Chart" className="w-4 h-4" />
-            <span className="truncate max-w-[250px]">{chartName}</span>
-          </button>
+        {/* Chart buttons — one per generated chart */}
+        {charts.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {charts.map((chart, i) => (
+              <button
+                key={i}
+                onClick={() => onChartClick?.(chart.url, chart.html, chart.name)}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono bg-muted border border-border hover:bg-muted/80 hover:border-primary/50 transition-colors cursor-pointer"
+                title="Click to view chart"
+              >
+                <img src="/assets/chart-icon.png" alt="Chart" className="w-4 h-4" />
+                <span className="truncate max-w-[250px]">{chart.name}</span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

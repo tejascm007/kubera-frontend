@@ -75,9 +75,11 @@ import {
   adminPortfolioReportsApi,
   adminSystemApi,
   adminActivityLogsApi,
+  adminSuperApi,
   DashboardStats,
   AdminUserListItem,
   AdminUserDetail,
+  AdminListItem,
   RateLimitConfig,
   RateLimitViolation,
   PortfolioReportSettings,
@@ -94,6 +96,12 @@ export default function AdminDashboard() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Admin list (super admin only)
+  const [admins, setAdmins] = useState<AdminListItem[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null);
 
   // Dashboard stats
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -168,7 +176,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('kubera-admin-token');
+    const adminInfo = localStorage.getItem('kubera-admin');
     setIsAuthenticated(!!token);
+    if (adminInfo) {
+      try {
+        const parsed = JSON.parse(adminInfo);
+        setIsSuperAdmin(!!parsed.is_super_admin);
+      } catch {}
+    }
     setIsLoading(false);
   }, []);
 
@@ -211,6 +226,18 @@ export default function AdminDashboard() {
       toast({ title: 'Failed to load users', variant: 'destructive' });
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const fetchAdmins = async () => {
+    setAdminsLoading(true);
+    try {
+      const data = await adminSuperApi.getAdmins();
+      setAdmins(data.admins);
+    } catch (error) {
+      console.error('Failed to fetch admins:', error);
+    } finally {
+      setAdminsLoading(false);
     }
   };
 
@@ -298,8 +325,9 @@ export default function AdminDashboard() {
       fetchReportSettings();
       fetchActivityLogs();
       fetchPromptActivity();
+      if (isSuperAdmin) fetchAdmins();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isSuperAdmin]);
 
   useEffect(() => {
     if (isAuthenticated) fetchUsers();
@@ -512,6 +540,7 @@ export default function AdminDashboard() {
     fetchReportSettings();
     fetchActivityLogs();
     fetchPromptActivity();
+    if (isSuperAdmin) fetchAdmins();
   };
 
   const handlePeriodChange = (newPeriod: '24h' | '7d' | '30d') => {
@@ -533,10 +562,16 @@ export default function AdminDashboard() {
     return <Navigate to="/admin" replace />;
   }
   // Chart data with custom colors
+  // Normal admin: active/deactivated users only
+  // Super admin:  users + admins (lighter palette for admins)
   const userStatusData = stats ? [
-    { name: 'Active', value: stats.active_users || 0, color: '#72E3AD' },
-    { name: 'Deactivated', value: stats.deactivated_users || 0, color: 'rgba(249, 56, 56, 0.96)' },
-  ] : [];
+    { name: 'Active Users',      value: stats.active_users || 0,      color: '#4ADE80' },
+    { name: 'Deactivated Users', value: stats.deactivated_users || 0, color: '#F87171' },
+    ...(isSuperAdmin ? [
+      { name: 'Active Admins',   value: stats.active_admins ?? 0,   color: '#A5B4FC' },  // light indigo
+      { name: 'Inactive Admins', value: stats.inactive_admins ?? 0, color: '#D1D5DB' },  // light gray
+    ] : []),
+  ].filter(d => d.value > 0) : [];
 
   const promptsData = stats ? [
     { name: 'Today', value: stats.total_prompts_today || 0 },
@@ -553,7 +588,9 @@ export default function AdminDashboard() {
             <Link to="/admin/dashboard" className="brand-text text-xl tracking-widest">
               KUBERA
             </Link>
-            <Badge variant="secondary" className="text-xs">ADMIN</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN'}
+            </Badge>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={handleRefreshAll} title="Refresh">
@@ -628,10 +665,22 @@ export default function AdminDashboard() {
 
             {/* Charts */}
             <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
-              {/* User Status Pie Chart */}
+              {/* Pie Chart: title changes based on role */}
               <Card>
                 <CardHeader>
-                  <CardTitle>User Status Distribution</CardTitle>
+                  <CardTitle>
+                    {isSuperAdmin ? 'User & Admin Distribution' : 'User Status Distribution'}
+                  </CardTitle>
+                  {isSuperAdmin && (
+                    <CardDescription className="flex gap-4 text-xs mt-1">
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-[#4ADE80]" /> Users
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 rounded-full bg-[#A5B4FC]" /> Admins
+                      </span>
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="h-[250px]">
@@ -851,6 +900,95 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ---- Admins section (super admin only) ---- */}
+            {isSuperAdmin && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-indigo-400" />
+                      Admin Management
+                    </span>
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {admins.length} admin{admins.length !== 1 ? 's' : ''}
+                    </span>
+                  </CardTitle>
+                  <CardDescription>
+                    Manage normal admin accounts — only visible to super admins
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {adminsLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">Loading admins...</div>
+                  ) : admins.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No normal admins found</div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Last Login</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="text-center">Toggle</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {admins.map((admin) => (
+                          <TableRow key={admin.admin_id}>
+                            <TableCell className="font-medium">{admin.full_name}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{admin.email}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {admin.last_login_at
+                                ? new Date(admin.last_login_at).toLocaleDateString()
+                                : 'Never'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={admin.is_active ? 'default' : 'destructive'} className="text-xs">
+                                {admin.is_active ? 'active' : 'inactive'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={admin.is_active}
+                                disabled={adminActionLoading === admin.admin_id}
+                                onCheckedChange={async () => {
+                                  setAdminActionLoading(admin.admin_id);
+                                  try {
+                                    if (admin.is_active) {
+                                      await adminSuperApi.deactivateAdmin(admin.admin_id);
+                                    } else {
+                                      await adminSuperApi.reactivateAdmin(admin.admin_id);
+                                    }
+                                    setAdmins(prev =>
+                                      prev.map(a =>
+                                        a.admin_id === admin.admin_id
+                                          ? { ...a, is_active: !a.is_active }
+                                          : a
+                                      )
+                                    );
+                                    toast({
+                                      title: `Admin ${admin.is_active ? 'deactivated' : 'reactivated'}`,
+                                      description: `${admin.full_name} has been ${admin.is_active ? 'deactivated' : 'reactivated'}.`,
+                                    });
+                                    fetchDashboardStats();
+                                  } catch (error) {
+                                    toast({ title: 'Failed to update admin', variant: 'destructive' });
+                                  } finally {
+                                    setAdminActionLoading(null);
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* ==================== RATE LIMITS TAB ==================== */}

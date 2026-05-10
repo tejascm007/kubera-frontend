@@ -16,8 +16,10 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  chart_url?: string;
-  chart_html?: string;  // Chart HTML for direct rendering
+  chart_url?: string;           // legacy single (first chart)
+  chart_html?: string;          // legacy single
+  chart_urls?: string[];         // all chart URLs
+  chart_htmls?: string[];        // all chart HTMLs
 }
 
 interface Chat {
@@ -69,7 +71,7 @@ export default function ChatPage() {
   }, []);
 
   // WebSocket hook
-  const handleMessageComplete = useCallback((content: string, metadata?: { chart_url?: string; chart_html?: string }) => {
+  const handleMessageComplete = useCallback((content: string, metadata?: { chart_url?: string; chart_html?: string; chart_urls?: string[]; chart_htmls?: string[] }) => {
     if (!activeChat) return;
 
     // Debug: Log chart data to verify it's being received
@@ -85,7 +87,14 @@ export default function ChatPage() {
             ...chat,
             messages: chat.messages.map((msg, idx) =>
               idx === chat.messages.length - 1 && msg.role === 'assistant'
-                ? { ...msg, content, chart_url: metadata?.chart_url, chart_html: metadata?.chart_html }
+                ? {
+                    ...msg,
+                    content,
+                    chart_url: metadata?.chart_url,
+                    chart_html: metadata?.chart_html,
+                    chart_urls: metadata?.chart_urls ?? (metadata?.chart_url ? [metadata.chart_url] : []),
+                    chart_htmls: metadata?.chart_htmls ?? (metadata?.chart_html ? [metadata.chart_html] : []),
+                  }
                 : msg
             ),
             lastMessage: content.slice(0, 50),
@@ -220,11 +229,32 @@ export default function ChatPage() {
                   });
                   // Then assistant response if it exists
                   if (m.assistant_response) {
+                    // chart_url in DB may be a JSON array string (multiple charts)
+                    // or a plain URL string (single/legacy chart)
+                    let parsedChartUrls: string[] | undefined;
+                    let parsedChartUrl: string | undefined;
+                    if (m.chart_url) {
+                      try {
+                        const parsed = JSON.parse(m.chart_url);
+                        if (Array.isArray(parsed)) {
+                          parsedChartUrls = parsed;
+                          parsedChartUrl = parsed[0];
+                        } else {
+                          parsedChartUrl = m.chart_url;
+                          parsedChartUrls = [m.chart_url];
+                        }
+                      } catch {
+                        // Plain URL string (legacy)
+                        parsedChartUrl = m.chart_url;
+                        parsedChartUrls = [m.chart_url];
+                      }
+                    }
                     result.push({
                       id: m.message_id + '_assistant',
                       role: 'assistant',
                       content: m.assistant_response,
-                      chart_url: m.chart_url,
+                      chart_url: parsedChartUrl,
+                      chart_urls: parsedChartUrls,
                     });
                   }
                   return result;
@@ -501,6 +531,8 @@ export default function ChatPage() {
                       content={message.content}
                       chartUrl={message.chart_url}
                       chartHtml={message.chart_html}
+                      chartUrls={message.chart_urls}
+                      chartHtmls={message.chart_htmls}
                       isStreaming={isStreaming && isLastAssistant}
                       toolStatus={isLastAssistant ? toolStatus : []}
                       onChartClick={handleChartClick}
