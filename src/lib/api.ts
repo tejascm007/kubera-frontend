@@ -1,8 +1,10 @@
 // API Configuration and Service Layer for KUBERA Backend
 // Aligned with actual backend endpoints
 
-const API_BASE = 'http://localhost:8000';
-const WS_BASE = 'ws://localhost:8000';
+// const API_BASE = 'http://localhost:8000';
+// const WS_BASE = 'ws://localhost:8000';
+const API_BASE = 'http://54.206.176.208:8000';
+const WS_BASE = 'ws://54.206.176.208:8000';
 
 // ==================== TOKEN MANAGEMENT ====================
 // Supports "Remember Me" feature:
