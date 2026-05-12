@@ -1,7 +1,7 @@
 // Admin API Service Layer for KUBERA Backend
 // Aligned with actual backend /admin/* endpoints
 
-import { ApiError, getToken, clearTokens } from './api';
+import { ApiError, extractErrorMessage, getToken, clearTokens } from './api';
 
 // const API_BASE = 'http://localhost:8000';
 // const API_BASE = 'http://54.206.176.208:8000';
@@ -54,7 +54,7 @@ async function adminRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, error.detail || error.message || 'Request failed', error.error_code);
+    throw new ApiError(response.status, extractErrorMessage(error, 'Request failed'), error.error_code);
   }
 
   const text = await response.text();
@@ -99,7 +99,7 @@ export const adminAuthApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to send OTP');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to send OTP. Check if this email is registered as an admin.'));
     }
 
     return response.json();
@@ -115,7 +115,7 @@ export const adminAuthApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Invalid OTP');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Invalid OTP. Please check and try again.'));
     }
 
     return response.json();

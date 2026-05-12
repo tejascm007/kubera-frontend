@@ -83,6 +83,32 @@ export class ApiError extends Error {
   }
 }
 
+// ==================== ERROR EXTRACTION HELPER ====================
+// Backend KuberaException shape:  { success: false, error: { message: "...", details: [...] } }
+// FastAPI HTTPException shape:     { detail: "..." }
+// Fallback:                        { message: "..." }
+export function extractErrorMessage(body: any, fallback: string): string {
+  // 1. KuberaException — nested error object
+  if (body?.error?.message) {
+    const msg: string = body.error.message;
+    const details = body.error?.details;
+    // Append list-style details (e.g. password requirements, validation fields)
+    if (Array.isArray(details) && details.length > 0) {
+      const bulletPoints = details
+        .map((d: any) => (typeof d === 'string' ? d : d?.message || d?.msg))
+        .filter(Boolean)
+        .join('; ');
+      if (bulletPoints) return `${msg} — ${bulletPoints}`;
+    }
+    return msg;
+  }
+  // 2. FastAPI HTTPException
+  if (body?.detail) return String(body.detail);
+  // 3. Plain message
+  if (body?.message) return String(body.message);
+  return fallback;
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -115,19 +141,19 @@ async function apiRequest<T>(
 
       if (!retryResponse.ok) {
         const error = await retryResponse.json().catch(() => ({}));
-        throw new ApiError(retryResponse.status, error.detail || error.message || 'Request failed', error.error_code);
+        throw new ApiError(retryResponse.status, extractErrorMessage(error, 'Request failed'), error.error_code);
       }
       return retryResponse.json();
     } else {
       clearTokens();
       window.location.href = '/login';
-      throw new ApiError(401, 'Session expired');
+      throw new ApiError(401, 'Session expired. Please log in again.');
     }
   }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, error.detail || error.message || 'Request failed', error.error_code);
+    throw new ApiError(response.status, extractErrorMessage(error, 'Request failed'), error.error_code);
   }
 
   const text = await response.text();
@@ -234,7 +260,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || error.message || 'Invalid credentials', error.error_code);
+      throw new ApiError(response.status, extractErrorMessage(error, 'Invalid username or password'), error.error_code);
     }
 
     return response.json();
@@ -250,7 +276,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || error.message || 'Failed to send OTP', error.error_code);
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to send OTP'), error.error_code);
     }
 
     return response.json();
@@ -266,7 +292,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || error.message || 'Invalid OTP', error.error_code);
+      throw new ApiError(response.status, extractErrorMessage(error, 'Invalid OTP. Please check and try again.'), error.error_code);
     }
 
     return response.json();
@@ -282,7 +308,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || error.message || 'Registration failed', error.error_code);
+      throw new ApiError(response.status, extractErrorMessage(error, 'Registration failed. Please try again.'), error.error_code);
     }
 
     return response.json();
@@ -308,7 +334,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to send OTP');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to send password reset OTP'));
     }
 
     return response.json();
@@ -328,7 +354,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to reset password');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to reset password'));
     }
 
     return response.json();
@@ -344,7 +370,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to send OTP');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to send OTP'));
     }
 
     return response.json();
@@ -364,7 +390,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to reset password');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Failed to reset password'));
     }
 
     return response.json();
@@ -380,7 +406,7 @@ export const authApi = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(response.status, error.detail || 'Failed to refresh token');
+      throw new ApiError(response.status, extractErrorMessage(error, 'Session expired. Please log in again.'));
     }
 
     return response.json();
