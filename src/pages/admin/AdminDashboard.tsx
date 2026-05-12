@@ -616,7 +616,7 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="users" className="gap-2">
               <Users className="h-4 w-4" />
-              Users
+              {isSuperAdmin ? 'Users & Admins' : 'Users'}
             </TabsTrigger>
             <TabsTrigger value="ratelimits" className="gap-2">
               <Shield className="h-4 w-4" />
@@ -696,7 +696,7 @@ export default function AdminDashboard() {
                             innerRadius={50}
                             outerRadius={80}
                             paddingAngle={2}
-                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                            label={({ value, percent }) => `${value}(${(percent * 100).toFixed(0)}%)`}
                             labelLine={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
                           >
                             {userStatusData.map((entry, index) => (
