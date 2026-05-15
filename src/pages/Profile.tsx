@@ -51,9 +51,9 @@ export default function Profile() {
     quantity: '',
     buyPrice: '',
     buyDate: new Date().toISOString().split('T')[0],
-    notes: '',
     investmentType: 'long-term',
     customInvestmentType: '',
+    notes: ''
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isAddingHolding, setIsAddingHolding] = useState(false);
@@ -155,18 +155,19 @@ export default function Profile() {
 
     setIsAddingHolding(true);
     try {
-      const resolvedInvestmentType =
+      const investmentTypeValue =
         newHolding.investmentType === 'custom'
           ? newHolding.customInvestmentType.trim()
           : newHolding.investmentType;
 
+      // Backend: POST /portfolio/ with correct field names
       const response = await portfolioApi.addEntry({
         stock_symbol: newHolding.symbol.toUpperCase(),
-        exchange: 'NSE',
+        exchange: 'NSE', // Default to NSE
         quantity: parseInt(newHolding.quantity),
         buy_price: parseFloat(newHolding.buyPrice),
         buy_date: newHolding.buyDate,
-        investment_type: resolvedInvestmentType || undefined,
+        investment_type: investmentTypeValue || undefined,
         notes: newHolding.notes || undefined,
       });
 
@@ -185,7 +186,7 @@ export default function Profile() {
         },
       ]);
 
-      setNewHolding({ symbol: '', quantity: '', buyPrice: '', buyDate: new Date().toISOString().split('T')[0], notes: '', investmentType: 'long-term', customInvestmentType: '' });
+      setNewHolding({ symbol: '', quantity: '', buyPrice: '', buyDate: new Date().toISOString().split('T')[0], investmentType: 'long-term', customInvestmentType: '', notes: '' });
       setDialogOpen(false);
       toast({ title: 'Holding added', description: `${entry.stock_symbol} has been added to your portfolio.` });
     } catch (error) {
@@ -336,25 +337,26 @@ export default function Profile() {
                       value={newHolding.investmentType}
                       onValueChange={(v) => setNewHolding({ ...newHolding, investmentType: v, customInvestmentType: '' })}
                     >
-                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="long-term">Long Term</SelectItem>
                         <SelectItem value="short-term">Short Term</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                         <SelectItem value="custom">Custom...</SelectItem>
                       </SelectContent>
                     </Select>
                     {newHolding.investmentType === 'custom' && (
                       <Input
-                        placeholder="e.g., Swing Trade, Dividend, Speculation"
+                        placeholder="e.g., Swing Trade, SIP, Hedge"
                         value={newHolding.customInvestmentType}
                         onChange={(e) => setNewHolding({ ...newHolding, customInvestmentType: e.target.value })}
-                        maxLength={100}
+                        maxLength={50}
                       />
                     )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Notes (Optional)</label>
-                    <Input placeholder="e.g., Good entry point" value={newHolding.notes} onChange={(e) => setNewHolding({ ...newHolding, notes: e.target.value })} />
+                    <Input placeholder="e.g., Added on dip" value={newHolding.notes} onChange={(e) => setNewHolding({ ...newHolding, notes: e.target.value })} />
                   </div>
                   <Button onClick={handleAddHolding} className="w-full" disabled={isAddingHolding}>
                     {isAddingHolding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Add Holding
