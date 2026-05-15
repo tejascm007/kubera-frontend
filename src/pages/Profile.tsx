@@ -157,10 +157,10 @@ export default function Profile() {
       const response = await portfolioApi.addEntry({
         stock_symbol: newHolding.symbol.toUpperCase(),
         exchange: 'NSE', // Default to NSE
+        investment_type: 'equity', // All stocks added via portfolio are equity
         quantity: parseInt(newHolding.quantity),
         buy_price: parseFloat(newHolding.buyPrice),
         buy_date: newHolding.buyDate,
-        investment_type: 'Equity',
         notes: newHolding.notes || undefined,
       });
 
