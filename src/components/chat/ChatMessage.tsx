@@ -120,7 +120,7 @@ export function ChatMessage({ role, content, chartUrl, chartHtml, chartUrls, cha
     : chartUrl ? [chartUrl] : [];
 
   const contentUrls: string[] =
-    content.match(/https:\/\/[^\s)]+supabase[^\s)]+charts[^\s)]+\.html/g) ?? [];
+    content.match(/https:\/\/[^\s)]+supabase[^\s)]+\.html/g) ?? [];
 
   // Merge, deduplicate
   const allUrls = [...new Set([...propUrls, ...contentUrls])];
@@ -198,8 +198,8 @@ export function ChatMessage({ role, content, chartUrl, chartHtml, chartUrls, cha
                   pre: ({ children }) => <>{children}</>,
                   // Custom link handler — render chart links as buttons, others normally
                   a: ({ href, children }) => {
-                    if (href?.includes('supabase') && href?.includes('charts')) {
-                      // Render as a chart button instead of a plain link
+                    // Detect Supabase-hosted HTML chart files (stored in any bucket subfolder)
+                    if (href?.includes('supabase') && href?.includes('.html')) {
                       const linkText = typeof children === 'string' ? children : String(children);
                       const chartName = linkText || href.split('/').pop()?.replace(/_/g, ' ').replace('.html', '') || 'Stock Chart';
                       return (
@@ -213,16 +213,14 @@ export function ChatMessage({ role, content, chartUrl, chartHtml, chartUrls, cha
                         </button>
                       );
                     }
-                    // Render other links normally
                     return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{children}</a>;
                   },
-                  // Custom image handler - hide chart URLs (they're HTML files, not images)
+                  // Custom image handler - hide Supabase HTML chart files (they're not images)
                   img: ({ src, alt }) => {
-                    // Skip Supabase chart URLs (they're HTML files, not images)
-                    if (src?.includes('supabase') && src?.includes('charts')) {
-                      return null; // Don't render - chart button handles this
+                    // Supabase .html files must never render as <img> — they are interactive charts
+                    if (src?.includes('supabase') && src?.includes('.html')) {
+                      return null; // Suppressed — chart button from metadata handles display
                     }
-                    // Render other images normally
                     return <img src={src} alt={alt || ''} className="rounded-md my-2" />;
                   },
                 }}
