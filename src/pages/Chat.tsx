@@ -271,33 +271,18 @@ export default function ChatPage() {
     loadChatMessages();
   }, [activeChat]); // Only depend on activeChat, NOT chats
 
-  const scrollToBottom = () => {
+  // Smooth scroll only when a new message is added or chat switches
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [chats, activeChat]);
 
+  // During streaming: instant scroll (no animation) so there's no shake
   useEffect(() => {
-    scrollToBottom();
-  }, [chats, activeChat, streamingContent]);
+    if (streamingContent) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    }
+  }, [streamingContent]);
 
-  // Update streaming content in messages
-  useEffect(() => {
-    if (!activeChat || !streamingContent) return;
-
-    setChats(prev =>
-      prev.map(chat =>
-        chat.id === activeChat
-          ? {
-            ...chat,
-            messages: chat.messages.map((msg, idx) =>
-              idx === chat.messages.length - 1 && msg.role === 'assistant'
-                ? { ...msg, content: streamingContent }
-                : msg
-            ),
-          }
-          : chat
-      )
-    );
-  }, [streamingContent, activeChat]);
 
   // Sidebar resize handlers - must be before conditional returns
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -528,7 +513,7 @@ export default function ChatPage() {
                     <ChatMessage
                       key={message.id}
                       role={message.role}
-                      content={message.content}
+                      content={isStreaming && isLastAssistant ? streamingContent : message.content}
                       chartUrl={message.chart_url}
                       chartHtml={message.chart_html}
                       chartUrls={message.chart_urls}

@@ -3,10 +3,10 @@
 
 import { ApiError, extractErrorMessage, getToken, clearTokens } from './api';
 
-// const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:8000';
 // const API_BASE = 'http://54.206.176.208:8000';
 
-const API_BASE = 'https://kubera007.duckdns.org'; //https and http clash with vercel on https and ec2 server on http 
+// const API_BASE = 'https://kubera007.duckdns.org'; //https and http clash with vercel on https and ec2 server on http 
 
 
 // ==================== ADMIN TOKEN MANAGEMENT ====================
