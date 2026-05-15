@@ -160,6 +160,7 @@ export default function Profile() {
         quantity: parseInt(newHolding.quantity),
         buy_price: parseFloat(newHolding.buyPrice),
         buy_date: newHolding.buyDate,
+        investment_type: 'Equity',
         notes: newHolding.notes || undefined,
       });
 
