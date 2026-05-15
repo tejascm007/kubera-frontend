@@ -34,6 +34,7 @@ export default function Profile() {
   const [profile, setProfile] = useState({
     name: '',
     email: '',
+    phone: '',
     username: '',
     riskTolerance: 'medium',
     investmentStyle: 'mixed',
@@ -66,6 +67,7 @@ export default function Profile() {
         setProfile({
           name: profileData.full_name || '',
           email: profileData.email || '',
+          phone: profileData.phone || '',
           username: profileData.username || '',
           riskTolerance: profileData.risk_tolerance || 'medium',
           investmentStyle: profileData.investment_style || 'mixed',
@@ -133,6 +135,7 @@ export default function Profile() {
       // Backend expects: full_name, risk_tolerance, investment_style (not investment_horizon)
       await userApi.updateProfile({
         full_name: profile.name,
+        phone: profile.phone.trim() !== '' ? profile.phone.trim() : null,
         risk_tolerance: profile.riskTolerance,
         investment_style: profile.investmentStyle,
       });
@@ -268,6 +271,18 @@ export default function Profile() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Email</label>
                   <p className="text-sm">{profile.email}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Phone</label>
+                  {isEditing ? (
+                    <Input
+                      placeholder="+919876543210"
+                      value={profile.phone}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-sm">{profile.phone || '—'}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground">Username</label>
