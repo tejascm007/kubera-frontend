@@ -167,7 +167,7 @@ export default function Profile() {
         quantity: parseInt(newHolding.quantity),
         buy_price: parseFloat(newHolding.buyPrice),
         buy_date: newHolding.buyDate,
-        investment_type: investmentTypeValue || undefined,
+        investment_type: investmentTypeValue || undefined, //user can select his investment type or custom add it
         notes: newHolding.notes || undefined,
       });
 
@@ -179,7 +179,7 @@ export default function Profile() {
           symbol: entry.stock_symbol,
           quantity: entry.quantity,
           avgPrice: entry.buy_price,
-          sector: entry.investment_type || 'Other',
+          sector: entry.investment_type || 'Other', 
           currentPrice: entry.current_price,
           gainLoss: entry.gain_loss,
           gainLossPercent: entry.gain_loss_percent,
